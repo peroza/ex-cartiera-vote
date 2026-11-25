@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Criteria — Ex Cartiera</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      .wrap {
+        width: min(1100px, calc(100% - 2rem));
+        margin: 0 auto;
+        padding: 1.5rem 0 2.5rem;
+      }
+      h1 {
+        font-family: var(--font-display);
+        font-size: clamp(2.4rem, 6vw, 4rem);
+        margin: 0.25rem 0 1.2rem;
+        letter-spacing: -0.05em;
+      }
+      .list {
+        display: grid;
+        gap: 0.9rem;
+      }
+      .item {
+        padding: 1.2rem 1.3rem;
+        display: grid;
+        grid-template-columns: 4.2rem 1fr;
+        gap: 1rem;
+        align-items: start;
+      }
+      .num {
+        font-family: var(--font-display);
+        font-size: 2.4rem;
+        line-height: 1;
+        color: var(--pine);
+      }
+      .item h2 {
+        margin: 0 0 0.35rem;
+        font-family: var(--font-display);
+        font-size: 1.45rem;
+      }
+      .item p {
+        margin: 0;
+        color: var(--ink-soft);
+        font-size: 1.05rem;
+      }
+      .scale {
+        margin-top: 1rem;
+        padding: 1rem 1.2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <div class="eyebrow">Scoring guide · 1–5</div>
+      <h1 class="brand">Ex Cartiera criteria</h1>
+      <div class="list" id="list"></div>
+      <section class="panel scale rise">
+        <strong>Scale:</strong>
+        1 = weak · 2 = limited · 3 = adequate · 4 = strong · 5 = excellent
+      </section>
+    </main>
+    <script type="module">
+      import { connectLive, onState } from "/shared.js";
+      const list = document.getElementById("list");
+      onState((state) => {
+        list.innerHTML = state.criteria
+          .map(
+            (c, i) => `
+          <article class="panel item rise" style="animation-delay:${i * 0.05}s">
+            <div class="num">0${i + 1}</div>
+            <div>
+              <h2>${c.short}</h2>
+              <p>${c.question}</p>
+            </div>
+          </article>`
+          )
+          .join("");
+      });
+      connectLive();
+    </script>
+  </body>
+</html>

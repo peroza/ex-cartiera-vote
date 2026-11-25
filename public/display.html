@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Live Display — Ex Cartiera</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      body {
+        background:
+          radial-gradient(900px 500px at 80% -10%, rgba(198, 232, 107, 0.18), transparent 50%),
+          linear-gradient(160deg, #0f2a22 0%, #16362c 45%, #1f4a3c 100%);
+        color: #eef5f0;
+        min-height: 100vh;
+      }
+      .shell {
+        width: min(1280px, calc(100% - 2.5rem));
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        align-items: end;
+        margin-bottom: 1.4rem;
+      }
+      .header h1 {
+        font-family: var(--font-display);
+        font-size: clamp(2.6rem, 7vw, 4.6rem);
+        margin: 0.2rem 0 0;
+        letter-spacing: -0.05em;
+      }
+      .stat {
+        text-align: right;
+      }
+      .stat .num {
+        font-family: var(--font-display);
+        font-size: clamp(2.4rem, 6vw, 4rem);
+        line-height: 1;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+      }
+      .card {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 22px;
+        padding: 1.2rem 1.3rem 1.35rem;
+        min-height: 180px;
+      }
+      .card h2 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 1.7rem;
+        letter-spacing: -0.03em;
+      }
+      .count {
+        margin-top: 0.8rem;
+        font-size: 2.6rem;
+        font-family: var(--font-display);
+        font-weight: 800;
+      }
+      .results {
+        margin-top: 1.2rem;
+      }
+      .results h2 {
+        font-family: var(--font-display);
+        font-size: 2rem;
+        margin: 0 0 0.8rem;
+      }
+      .board {
+        display: grid;
+        gap: 1rem;
+      }
+      .board-card {
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 20px;
+        padding: 1rem 1.15rem;
+      }
+      .board-card .title {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        align-items: baseline;
+        margin-bottom: 0.8rem;
+      }
+      .board-card h3 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 1.45rem;
+      }
+      .overall {
+        font-family: var(--font-display);
+        font-size: 2rem;
+        color: var(--lime);
+      }
+      .bar-track {
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .bar-fill {
+        background: linear-gradient(90deg, #7cbc8f, var(--lime));
+      }
+      .progress-track {
+        background: rgba(255, 255, 255, 0.12);
+        margin-top: 0.7rem;
+      }
+      .live-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+      }
+      @media (max-width: 800px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell" style="padding-top: 1.6rem">
+      <header class="header rise">
+        <div>
+          <div class="live-row"><span class="live-dot"></span> Live voting</div>
+          <h1 class="brand">Ex Cartiera</h1>
+        </div>
+        <div class="stat">
+          <div class="eyebrow" style="color: var(--lime)">Votes in</div>
+          <div class="num" id="voteCount">0/16</div>
+          <div class="progress-track" style="width: 220px; margin-left: auto">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+        </div>
+      </header>
+
+      <section class="grid" id="liveGrid"></section>
+
+      <section class="results" id="resultsSection" hidden>
+        <h2>Final scores</h2>
+        <div class="board" id="resultsBoard"></div>
+      </section>
+    </main>
+
+    <script type="module">
+      import { connectLive, onState, progressPercent } from "/shared.js";
+
+      const liveGrid = document.getElementById("liveGrid");
+      const resultsSection = document.getElementById("resultsSection");
+      const resultsBoard = document.getElementById("resultsBoard");
+      const voteCount = document.getElementById("voteCount");
+      const progressFill = document.getElementById("progressFill");
+
+      function renderLive(state) {
+        const items = state.live?.presentations || state.presentations.map((p) => ({
+          presentationId: p.id,
+          name: p.name,
+          voteCount: 0,
+        }));
+        liveGrid.innerHTML = items
+          .map(
+            (p, index) => `
+          <article class="card rise" style="animation-delay:${index * 0.05}s">
+            <h2>${p.name}</h2>
+            <div class="count">${p.voteCount}<span style="font-size:1rem;opacity:.7"> votes</span></div>
+            <div class="progress-track">
+              <div class="progress-fill" style="width:${
+                state.progress.totalQuota
+                  ? Math.round((p.voteCount / state.progress.totalQuota) * 100)
+                  : 0
+              }%"></div>
+            </div>
+          </article>`
+          )
+          .join("");
+      }
+
+      function renderResults(state) {
+        if (!state.resultsRevealed || !state.results) {
+          resultsSection.hidden = true;
+          return;
+        }
+        resultsSection.hidden = false;
+        const ranking = state.results.ranking;
+        resultsBoard.innerHTML = ranking
+          .map((p, index) => {
+            const criteriaBars = state.criteria
+              .map((c) => {
+                const avg = p.criteria[c.id].average;
+                const width = avg == null ? 0 : (avg / state.scoreMax) * 100;
+                return `
+                  <div class="bar-row">
+                    <div>${c.short}</div>
+                    <div class="bar-track"><div class="bar-fill" style="width:${width}%"></div></div>
+                    <strong>${avg == null ? "—" : avg.toFixed(2)}</strong>
+                  </div>`;
+              })
+              .join("");
+            return `
+              <article class="board-card rise" style="animation-delay:${index * 0.06}s">
+                <div class="title">
+                  <h3>#${index + 1} · ${p.name}</h3>
+                  <div class="overall">${
+                    p.overallAverage == null ? "—" : p.overallAverage.toFixed(2)
+                  }</div>
+                </div>
+                <div class="bar-chart">${criteriaBars}</div>
+              </article>`;
+          })
+          .join("");
+      }
+
+      onState((state) => {
+        voteCount.textContent = `${state.progress.voteCount}/${state.progress.totalQuota}`;
+        progressFill.style.width = `${progressPercent(state.progress)}%`;
+        renderLive(state);
+        renderResults(state);
+      });
+
+      connectLive();
+    </script>
+  </body>
+</html>

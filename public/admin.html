@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin — Ex Cartiera</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      .wrap {
+        width: min(900px, calc(100% - 1.5rem));
+        margin: 0 auto;
+        padding: 1.2rem 0 3rem;
+      }
+      h1 {
+        font-family: var(--font-display);
+        font-size: 2.4rem;
+        margin: 0.2rem 0 1rem;
+      }
+      .card {
+        padding: 1.1rem 1.2rem;
+        margin-bottom: 1rem;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        margin-top: 0.8rem;
+      }
+      .names {
+        display: grid;
+        gap: 0.7rem;
+      }
+      .names .field {
+        grid-template-columns: 1fr;
+      }
+      .qr {
+        width: 180px;
+        border-radius: 12px;
+        background: #fff;
+        padding: 0.5rem;
+      }
+      .meta {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.8rem;
+      }
+      @media (max-width: 700px) {
+        .meta {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <div class="eyebrow">Control room</div>
+      <h1>Admin</h1>
+
+      <section class="panel card" id="loginCard">
+        <div class="field">
+          <label for="pin">Admin PIN</label>
+          <input id="pin" inputmode="numeric" maxlength="8" placeholder="4-digit PIN" />
+        </div>
+        <div class="row">
+          <button class="btn" id="loginBtn" type="button">Unlock</button>
+        </div>
+        <p class="muted" style="font-size: 0.9rem">
+          PIN is printed in the server logs on startup. Check Render logs if you lost it.
+        </p>
+      </section>
+
+      <div id="console" hidden>
+        <section class="panel card">
+          <div class="meta">
+            <div>
+              <div class="eyebrow">Status</div>
+              <p id="statusText" style="margin: 0.35rem 0; font-size: 1.1rem"></p>
+              <div class="row">
+                <button class="btn lime" id="openBtn" type="button">Open voting</button>
+                <button class="btn secondary" id="closeBtn" type="button">Close voting</button>
+                <button class="btn" id="revealBtn" type="button">Reveal results</button>
+                <button class="btn secondary" id="hideBtn" type="button">Hide results</button>
+                <button class="btn danger" id="resetBtn" type="button">Reset all votes</button>
+              </div>
+            </div>
+            <div>
+              <div class="eyebrow">QR for voters</div>
+              <img class="qr" id="qr" alt="Voting QR code" />
+            </div>
+          </div>
+        </section>
+
+        <section class="panel card">
+          <h2 style="margin: 0 0 0.8rem; font-family: var(--font-display)">Presentation names</h2>
+          <div class="names" id="nameFields"></div>
+          <div class="row">
+            <button class="btn" id="saveNames" type="button">Save names</button>
+          </div>
+        </section>
+
+        <section class="panel card">
+          <h2 style="margin: 0 0 0.5rem; font-family: var(--font-display)">Room screens</h2>
+          <div class="row">
+            <a class="btn secondary" href="/display.html" target="_blank">Open live display</a>
+            <a class="btn secondary" href="/criteria.html" target="_blank">Open criteria</a>
+            <a class="btn secondary" href="/" target="_blank">Open home + QR</a>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script type="module">
+      import {
+        adminFetch,
+        connectLive,
+        onState,
+        showToast,
+        storageGet,
+        storageSet,
+      } from "/shared.js";
+
+      const PIN_KEY = "excartiera_admin_pin";
+      let pin = storageGet(PIN_KEY) || "";
+      let unlocked = false;
+
+      const loginCard = document.getElementById("loginCard");
+      const consoleEl = document.getElementById("console");
+      const statusText = document.getElementById("statusText");
+      const nameFields = document.getElementById("nameFields");
+      const pinInput = document.getElementById("pin");
+
+      async function unlock(candidate) {
+        const data = await adminFetch("/api/admin/login", {
+          method: "POST",
+          body: { adminPin: candidate },
+        });
+        pin = candidate;
+        storageSet(PIN_KEY, pin);
+        unlocked = true;
+        loginCard.hidden = true;
+        consoleEl.hidden = false;
+        document.getElementById("qr").src = `/api/qr?t=${Date.now()}`;
+        render(data.state);
+        showToast("Admin unlocked");
+      }
+
+      function render(state) {
+        if (!unlocked) return;
+        statusText.textContent = `Phase: ${state.phase} · Votes ${state.progress.voteCount}/${state.progress.totalQuota} · Results ${
+          state.resultsRevealed ? "revealed" : "hidden"
+        } · Roles S ${state.progress.roleCounts.student}/${state.progress.roleQuotas.student}, T ${state.progress.roleCounts.teacher}/${state.progress.roleQuotas.teacher}, St ${state.progress.roleCounts.staff}/${state.progress.roleQuotas.staff}`;
+
+        nameFields.innerHTML = state.presentations
+          .map(
+            (p) => `
+          <div class="field">
+            <label for="name-${p.id}">${p.id}</label>
+            <input id="name-${p.id}" data-id="${p.id}" value="${p.name.replaceAll('"', "&quot;")}" />
+          </div>`
+          )
+          .join("");
+      }
+
+      document.getElementById("loginBtn").addEventListener("click", async () => {
+        try {
+          await unlock(pinInput.value.trim());
+        } catch (error) {
+          showToast(error.message);
+        }
+      });
+
+      document.getElementById("openBtn").addEventListener("click", async () => {
+        try {
+          const data = await adminFetch("/api/admin/phase", {
+            pin,
+            method: "POST",
+            body: { phase: "open" },
+          });
+          render(data.state);
+        } catch (error) {
+          showToast(error.message);
+        }
+      });
+
+      document.getElementById("closeBtn").addEventListener("click", async () => {
+        try {
+          const data = await adminFetch("/api/admin/phase", {
+            pin,
+            method: "POST",
+            body: { phase: "closed" },
+          });
+          render(data.state);
+        } catch (error) {
+          showToast(error.message);
+        }
+      });
+
+      document.getElementById("revealBtn").addEventListener("click", async () => {
+        try {
+          const data = await adminFetch("/api/admin/reveal", {
+            pin,
+            method: "POST",
+            body: { revealed: true },
+          });
+          render(data.state);
+          showToast("Results revealed on display");
+        } catch (error) {
+          showToast(error.message);
+        }
+      });
+
+      document.getElementById("hideBtn").addEventListener("click", async () => {
+        try {
+          const data = await adminFetch("/api/admin/reveal", {
+            pin,
+            method: "POST",
+            body: { revealed: false },
+          });
+          render(data.state);
+        } catch (error) {
+          showToast(error.message);
+        }
+      });
+
+      document.getElementById("resetBtn").addEventListener("click", async () => {
+        if (!confirm("Reset all voters and votes?")) return;
+        try {
+          const data = await adminFetch("/api/admin/reset", {
+            pin,
+            method: "POST",
+            body: {},
+          });
+          render(data.state);
+          showToast("Reset complete");
+        } catch (error) {
+          showToast(error.message);
+        }
+      });
+
+      document.getElementById("saveNames").addEventListener("click", async () => {
+        const presentations = [...nameFields.querySelectorAll("input")].map((input) => ({
+          id: input.dataset.id,
+          name: input.value,
+        }));
+        try {
+          const data = await adminFetch("/api/admin/presentations", {
+            pin,
+            method: "POST",
+            body: { presentations },
+          });
+          render(data.state);
+          showToast("Names saved");
+        } catch (error) {
+          showToast(error.message);
+        }
+      });
+
+      onState((state) => render(state));
+      connectLive();
+
+      if (pin) {
+        unlock(pin).catch(() => {
+          unlocked = false;
+          storageSet(PIN_KEY, "");
+        });
+      }
+    </script>
+  </body>
+</html>

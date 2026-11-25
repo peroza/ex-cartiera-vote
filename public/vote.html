@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vote — Ex Cartiera</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      .vote-wrap {
+        width: min(720px, calc(100% - 1.25rem));
+        margin: 0 auto;
+        padding: 1rem 0 3rem;
+      }
+      .top {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        align-items: end;
+        margin-bottom: 1rem;
+      }
+      .top h1 {
+        font-family: var(--font-display);
+        font-size: clamp(2rem, 7vw, 3rem);
+        margin: 0.2rem 0 0;
+        letter-spacing: -0.04em;
+      }
+      .card {
+        padding: 1.1rem;
+        margin-bottom: 1rem;
+      }
+      .pres-title {
+        font-family: var(--font-display);
+        font-size: 1.35rem;
+        margin: 0 0 0.85rem;
+      }
+      .criterion {
+        padding: 0.85rem 0;
+        border-top: 1px solid var(--line);
+      }
+      .criterion:first-of-type {
+        border-top: 0;
+        padding-top: 0;
+      }
+      .criterion h3 {
+        margin: 0 0 0.25rem;
+        font-size: 0.95rem;
+      }
+      .criterion p {
+        margin: 0 0 0.65rem;
+        font-size: 0.88rem;
+        color: var(--ink-soft);
+      }
+      .sticky {
+        position: sticky;
+        bottom: 0.75rem;
+        z-index: 5;
+      }
+      .sticky .btn {
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="vote-wrap">
+      <div class="top">
+        <div>
+          <div class="eyebrow">Ex Cartiera</div>
+          <h1>Cast your scores</h1>
+        </div>
+        <span class="pill" id="statusPill">Loading…</span>
+      </div>
+
+      <section class="panel card rise" id="joinCard">
+        <div class="field" style="margin-bottom: 0.8rem">
+          <label for="role">Your role</label>
+          <select id="role"></select>
+        </div>
+        <div class="field" style="margin-bottom: 1rem">
+          <label for="name">Name (optional)</label>
+          <input id="name" maxlength="40" placeholder="e.g. Alex" />
+        </div>
+        <p class="muted" id="quotaHint" style="margin-top: 0; font-size: 0.9rem"></p>
+        <button class="btn lime" id="joinBtn" type="button">Start voting</button>
+      </section>
+
+      <form id="ballot" class="rise" hidden>
+        <div id="ballotBody"></div>
+        <div class="sticky">
+          <button class="btn" id="submitBtn" type="submit">Submit all scores</button>
+        </div>
+      </form>
+    </main>
+
+    <script type="module">
+      import {
+        connectLive,
+        onState,
+        showToast,
+        storageGet,
+        storageSet,
+      } from "/shared.js";
+
+      const VOTER_KEY = "excartiera_voter_id";
+      let state = null;
+      let voterId = storageGet(VOTER_KEY);
+      let existingScores = null;
+
+      const roleSelect = document.getElementById("role");
+      const quotaHint = document.getElementById("quotaHint");
+      const joinCard = document.getElementById("joinCard");
+      const ballot = document.getElementById("ballot");
+      const ballotBody = document.getElementById("ballotBody");
+      const statusPill = document.getElementById("statusPill");
+      const submitBtn = document.getElementById("submitBtn");
+
+      function renderRoleOptions() {
+        roleSelect.innerHTML = state.roles
+          .map((r) => {
+            const used = state.progress.roleCounts[r.id] || 0;
+            const full = used >= r.quota;
+            return `<option value="${r.id}" ${full ? "disabled" : ""}>${r.label} (${used}/${r.quota})</option>`;
+          })
+          .join("");
+        const firstOpen = state.roles.find(
+          (r) => (state.progress.roleCounts[r.id] || 0) < r.quota
+        );
+        if (firstOpen) roleSelect.value = firstOpen.id;
+        quotaHint.textContent = `Seats left — students ${
+          state.progress.roleQuotas.student - (state.progress.roleCounts.student || 0)
+        }, teachers ${
+          state.progress.roleQuotas.teacher - (state.progress.roleCounts.teacher || 0)
+        }, staff ${
+          state.progress.roleQuotas.staff - (state.progress.roleCounts.staff || 0)
+        }.`;
+      }
+
+      function scoreValue(presentationId, criterionId) {
+        return existingScores?.[presentationId]?.[criterionId] ?? null;
+      }
+
+      function renderBallot() {
+        ballotBody.innerHTML = state.presentations
+          .map(
+            (p) => `
+          <section class="panel card" data-presentation="${p.id}">
+            <h2 class="pres-title">${p.name}</h2>
+            ${state.criteria
+              .map(
+                (c) => `
+              <div class="criterion">
+                <h3>${c.short}</h3>
+                <p>${c.question}</p>
+                <div class="score-scale" role="group" aria-label="${c.short}">
+                  ${[1, 2, 3, 4, 5]
+                    .map((n) => {
+                      const pressed = scoreValue(p.id, c.id) === n;
+                      return `<button type="button" data-p="${p.id}" data-c="${c.id}" data-v="${n}" aria-pressed="${pressed}">${n}</button>`;
+                    })
+                    .join("")}
+                </div>
+              </div>`
+              )
+              .join("")}
+          </section>`
+          )
+          .join("");
+      }
+
+      function collectScores() {
+        const scores = {};
+        for (const p of state.presentations) {
+          scores[p.id] = {};
+          for (const c of state.criteria) {
+            const selected = ballotBody.querySelector(
+              `button[data-p="${p.id}"][data-c="${c.id}"][aria-pressed="true"]`
+            );
+            if (!selected) return null;
+            scores[p.id][c.id] = Number(selected.dataset.v);
+          }
+        }
+        return scores;
+      }
+
+      async function ensureVoterSession() {
+        if (!voterId) return false;
+        const res = await fetch(`/api/voters/${voterId}`);
+        if (!res.ok) {
+          voterId = null;
+          storageSet(VOTER_KEY, "");
+          return false;
+        }
+        const data = await res.json();
+        existingScores = data.vote?.scores || null;
+        return true;
+      }
+
+      function showBallotMode() {
+        joinCard.hidden = true;
+        ballot.hidden = false;
+        renderBallot();
+        statusPill.textContent =
+          state.phase === "closed" ? "Voting closed" : "Connected";
+        submitBtn.disabled = state.phase === "closed";
+      }
+
+      function showJoinMode() {
+        joinCard.hidden = false;
+        ballot.hidden = true;
+        renderRoleOptions();
+        statusPill.textContent =
+          state.phase === "closed" ? "Voting closed" : "Join to vote";
+        document.getElementById("joinBtn").disabled = state.phase === "closed";
+      }
+
+      ballotBody.addEventListener("click", (event) => {
+        const btn = event.target.closest("button[data-p]");
+        if (!btn) return;
+        const group = ballotBody.querySelectorAll(
+          `button[data-p="${btn.dataset.p}"][data-c="${btn.dataset.c}"]`
+        );
+        group.forEach((el) => el.setAttribute("aria-pressed", "false"));
+        btn.setAttribute("aria-pressed", "true");
+      });
+
+      document.getElementById("joinBtn").addEventListener("click", async () => {
+        try {
+          const res = await fetch("/api/voters", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              role: roleSelect.value,
+              displayName: document.getElementById("name").value,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Could not join");
+          voterId = data.voter.id;
+          storageSet(VOTER_KEY, voterId);
+          existingScores = null;
+          showBallotMode();
+          showToast("You are in — score every presentation");
+        } catch (error) {
+          showToast(error.message);
+        }
+      });
+
+      ballot.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const scores = collectScores();
+        if (!scores) {
+          showToast("Please score every criterion for all presentations");
+          return;
+        }
+        submitBtn.disabled = true;
+        try {
+          const res = await fetch("/api/votes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ voterId, scores }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Submit failed");
+          existingScores = scores;
+          showToast("Vote saved — you can update it until voting closes");
+        } catch (error) {
+          showToast(error.message);
+        } finally {
+          submitBtn.disabled = state.phase === "closed";
+        }
+      });
+
+      onState(async (next) => {
+        state = next;
+        if (voterId) {
+          const ok = await ensureVoterSession();
+          if (ok) showBallotMode();
+          else showJoinMode();
+        } else {
+          showJoinMode();
+        }
+      });
+
+      connectLive();
+    </script>
+  </body>
+</html>
