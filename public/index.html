@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ex Cartiera — Live Vote</title>
+    <title>Ex Cartiera Project Pitches — Live Vote</title>
     <link rel="stylesheet" href="/styles.css" />
     <style>
       .hero {
@@ -23,15 +23,28 @@
       }
       .hero-copy h1 {
         font-family: var(--font-display);
-        font-size: clamp(2.8rem, 8vw, 5.2rem);
-        margin: 0.35rem 0 0.8rem;
+        font-size: clamp(2.2rem, 7vw, 4.2rem);
+        margin: 0.35rem 0 0.35rem;
         letter-spacing: -0.05em;
-        line-height: 0.92;
+        line-height: 0.95;
+      }
+      .hero-copy .subtitle {
+        font-family: var(--font-display);
+        font-size: clamp(1.15rem, 3.2vw, 1.55rem);
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        margin: 0 0 0.85rem;
+        color: var(--pine);
       }
       .hero-copy p {
         font-size: 1.1rem;
-        max-width: 36ch;
+        max-width: 40ch;
         margin: 0 0 1.4rem;
+      }
+      .hero-copy .eyebrow {
+        max-width: 42ch;
+        line-height: 1.45;
+        text-wrap: pretty;
       }
       .actions {
         display: flex;
@@ -75,11 +88,12 @@
     <main class="shell hero">
       <div class="hero-grid">
         <section class="panel hero-copy rise">
-          <div class="eyebrow">University lecture · live scoring</div>
-          <h1 class="brand">Ex Cartiera</h1>
+          <div class="eyebrow">Food Policy Lab · University of Bologna · 26 November 2026</div>
+          <h1 class="brand">Ex Cartiera Project Pitches</h1>
+          <p class="subtitle">Policies for Sustainable Food Systems</p>
           <p class="muted">
-            Score four presentations across four criteria. Join from your phone,
-            watch votes arrive live on the room screens.
+            Rate each of the four project pitches from 1 to 5 on four criteria.
+            Final scores will be revealed once voting closes.
           </p>
           <div class="actions">
             <a class="btn lime" href="/vote.html">Vote now</a>
