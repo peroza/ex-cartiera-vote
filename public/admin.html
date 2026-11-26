@@ -41,12 +41,139 @@
       }
       .meta {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0.8rem;
+        grid-template-columns: 1.4fr auto;
+        gap: 1.1rem;
+        align-items: start;
+      }
+      .status-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.55rem;
+        margin: 0.7rem 0 1rem;
+      }
+      .stat {
+        background: rgba(31, 74, 60, 0.06);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 0.7rem 0.8rem;
+      }
+      .stat .label {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--moss);
+        font-weight: 600;
+      }
+      .stat .value {
+        margin-top: 0.25rem;
+        font-family: var(--font-display);
+        font-size: 1.15rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .stat.is-open .value { color: var(--ok); }
+      .stat.is-closed .value { color: var(--warn); }
+      .stat.is-live .value { color: var(--pine); }
+      .stat.is-hidden .value { color: var(--ink-soft); }
+      .role-meters {
+        display: grid;
+        gap: 0.45rem;
+        margin-bottom: 1.1rem;
+      }
+      .role-meter {
+        display: grid;
+        grid-template-columns: 7.5rem 1fr 2.6rem;
+        gap: 0.55rem;
+        align-items: center;
+        font-size: 0.9rem;
+      }
+      .role-meter .track {
+        height: 0.45rem;
+        border-radius: 999px;
+        background: rgba(20, 32, 28, 0.1);
+        overflow: hidden;
+      }
+      .role-meter .fill {
+        height: 100%;
+        background: var(--pine);
+        border-radius: inherit;
+        transition: width 0.35s ease;
+      }
+      .role-meter .count {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: var(--ink-soft);
+      }
+      .control-block {
+        border-top: 1px solid var(--line);
+        padding-top: 0.85rem;
+        margin-top: 0.85rem;
+      }
+      .control-block:first-of-type {
+        border-top: 0;
+        padding-top: 0;
+        margin-top: 0;
+      }
+      .control-block h3 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 1.05rem;
+        letter-spacing: -0.02em;
+      }
+      .control-block p {
+        margin: 0.25rem 0 0;
+        font-size: 0.86rem;
+        color: var(--ink-soft);
+      }
+      .control-block .row {
+        margin-top: 0.65rem;
+      }
+      .btn.is-current,
+      .btn.is-current:disabled {
+        opacity: 1;
+        cursor: default;
+        transform: none;
+        box-shadow: inset 0 0 0 2px rgba(15, 42, 34, 0.35);
+      }
+      .btn.lime.is-current:disabled {
+        background: var(--lime);
+        color: var(--pine-deep);
+      }
+      .btn.is-current:disabled:hover {
+        transform: none;
+        background: var(--pine);
+      }
+      .btn.lime.is-current:disabled:hover {
+        background: var(--lime);
+      }
+      .danger-zone {
+        margin-top: 1rem;
+        padding: 0.85rem 0.9rem;
+        border-radius: 14px;
+        border: 1px dashed rgba(180, 35, 24, 0.35);
+        background: rgba(180, 35, 24, 0.05);
+      }
+      .danger-zone p {
+        margin: 0.2rem 0 0.65rem;
+        font-size: 0.84rem;
+        color: var(--ink-soft);
+      }
+      .qr-box {
+        text-align: center;
       }
       @media (max-width: 700px) {
         .meta {
           grid-template-columns: 1fr;
+        }
+        .status-grid {
+          grid-template-columns: 1fr;
+        }
+        .role-meter {
+          grid-template-columns: 1fr auto;
+        }
+        .role-meter .track {
+          grid-column: 1 / -1;
+          order: 3;
         }
       }
     </style>
@@ -73,17 +200,50 @@
         <section class="panel card">
           <div class="meta">
             <div>
-              <div class="eyebrow">Status</div>
-              <p id="statusText" style="margin: 0.35rem 0; font-size: 1.1rem"></p>
-              <div class="row">
-                <button class="btn lime" id="openBtn" type="button">Open voting</button>
-                <button class="btn secondary" id="closeBtn" type="button">Close voting</button>
-                <button class="btn" id="revealBtn" type="button">Reveal results</button>
-                <button class="btn secondary" id="hideBtn" type="button">Hide results</button>
+              <div class="eyebrow">Live session</div>
+              <div class="status-grid" id="statusGrid" aria-live="polite">
+                <div class="stat" id="statPhase">
+                  <div class="label">Voting</div>
+                  <div class="value" id="phaseValue">—</div>
+                </div>
+                <div class="stat" id="statVotes">
+                  <div class="label">Votes in</div>
+                  <div class="value" id="votesValue">—</div>
+                </div>
+                <div class="stat" id="statResults">
+                  <div class="label">Leaderboard</div>
+                  <div class="value" id="resultsValue">—</div>
+                </div>
+              </div>
+
+              <div class="eyebrow">Role seats</div>
+              <div class="role-meters" id="roleMeters"></div>
+
+              <div class="control-block">
+                <h3>1 · Collect scores</h3>
+                <p>Open when people should vote. Close when everyone has submitted.</p>
+                <div class="row">
+                  <button class="btn lime" id="openBtn" type="button">Open voting</button>
+                  <button class="btn secondary" id="closeBtn" type="button">Close voting</button>
+                </div>
+              </div>
+
+              <div class="control-block">
+                <h3>2 · Show results on display</h3>
+                <p>Reveal the ranked scores on the projector. Hide to go back to live counters.</p>
+                <div class="row">
+                  <button class="btn" id="revealBtn" type="button">Reveal results</button>
+                  <button class="btn secondary" id="hideBtn" type="button">Hide results</button>
+                </div>
+              </div>
+
+              <div class="danger-zone">
+                <div class="eyebrow" style="color: var(--danger)">Danger</div>
+                <p>Clears every voter and every score. Use only before a fresh run.</p>
                 <button class="btn danger" id="resetBtn" type="button">Reset all votes</button>
               </div>
             </div>
-            <div>
+            <div class="qr-box">
               <div class="eyebrow">QR for voters</div>
               <img class="qr" id="qr" alt="Voting QR code" />
             </div>
@@ -125,9 +285,18 @@
 
       const loginCard = document.getElementById("loginCard");
       const consoleEl = document.getElementById("console");
-      const statusText = document.getElementById("statusText");
       const nameFields = document.getElementById("nameFields");
       const pinInput = document.getElementById("pin");
+      const openBtn = document.getElementById("openBtn");
+      const closeBtn = document.getElementById("closeBtn");
+      const revealBtn = document.getElementById("revealBtn");
+      const hideBtn = document.getElementById("hideBtn");
+
+      const ROLE_ORDER = [
+        { id: "student", label: "Students" },
+        { id: "teacher", label: "Teaching" },
+        { id: "staff", label: "Cartiera staff" },
+      ];
 
       async function unlock(candidate) {
         const data = await adminFetch("/api/admin/login", {
@@ -144,11 +313,50 @@
         showToast("Admin unlocked");
       }
 
+      function setToggleState(activeBtn, idleBtn, isActive) {
+        activeBtn.classList.toggle("is-current", isActive);
+        idleBtn.classList.toggle("is-current", !isActive);
+        activeBtn.disabled = isActive;
+        idleBtn.disabled = !isActive;
+        activeBtn.setAttribute("aria-pressed", String(isActive));
+        idleBtn.setAttribute("aria-pressed", String(!isActive));
+      }
+
       function render(state) {
         if (!unlocked) return;
-        statusText.textContent = `Phase: ${state.phase} · Votes ${state.progress.voteCount}/${state.progress.totalQuota} · Results ${
-          state.resultsRevealed ? "revealed" : "hidden"
-        } · Roles S ${state.progress.roleCounts.student}/${state.progress.roleQuotas.student}, T ${state.progress.roleCounts.teacher}/${state.progress.roleQuotas.teacher}, St ${state.progress.roleCounts.staff}/${state.progress.roleQuotas.staff}`;
+
+        const votingOpen = state.phase === "open";
+        const revealed = Boolean(state.resultsRevealed);
+
+        const phaseValue = document.getElementById("phaseValue");
+        const votesValue = document.getElementById("votesValue");
+        const resultsValue = document.getElementById("resultsValue");
+        const statPhase = document.getElementById("statPhase");
+        const statResults = document.getElementById("statResults");
+
+        phaseValue.textContent = votingOpen ? "Open" : "Closed";
+        votesValue.textContent = `${state.progress.voteCount}/${state.progress.totalQuota}`;
+        resultsValue.textContent = revealed ? "Showing" : "Hidden";
+
+        statPhase.classList.toggle("is-open", votingOpen);
+        statPhase.classList.toggle("is-closed", !votingOpen);
+        statResults.classList.toggle("is-live", revealed);
+        statResults.classList.toggle("is-hidden", !revealed);
+
+        document.getElementById("roleMeters").innerHTML = ROLE_ORDER.map(({ id, label }) => {
+          const used = state.progress.roleCounts[id] || 0;
+          const quota = state.progress.roleQuotas[id] || 0;
+          const pct = quota ? Math.min(100, Math.round((used / quota) * 100)) : 0;
+          return `
+            <div class="role-meter">
+              <span>${label}</span>
+              <div class="track" aria-hidden="true"><div class="fill" style="width:${pct}%"></div></div>
+              <span class="count">${used}/${quota}</span>
+            </div>`;
+        }).join("");
+
+        setToggleState(openBtn, closeBtn, votingOpen);
+        setToggleState(revealBtn, hideBtn, revealed);
 
         nameFields.innerHTML = state.presentations
           .map(

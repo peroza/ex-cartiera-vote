@@ -104,6 +104,7 @@
       let state = null;
       let voterId = storageGet(VOTER_KEY);
       let existingScores = null;
+      let redirectingToLive = false;
 
       const roleSelect = document.getElementById("role");
       const quotaHint = document.getElementById("quotaHint");
@@ -118,7 +119,7 @@
           .map((r) => {
             const used = state.progress.roleCounts[r.id] || 0;
             const full = used >= r.quota;
-            return `<option value="${r.id}" ${full ? "disabled" : ""}>${r.label} (${used}/${r.quota})</option>`;
+            return `<option value="${r.id}" ${full ? "disabled" : ""}>${r.label}</option>`;
           })
           .join("");
         const firstOpen = state.roles.find(
@@ -138,6 +139,32 @@
 
       function scoreValue(presentationId, criterionId) {
         return existingScores?.[presentationId]?.[criterionId] ?? null;
+      }
+
+      function presentationsChanged(prev, next) {
+        if (!prev?.presentations || !next?.presentations) return true;
+        if (prev.presentations.length !== next.presentations.length) return true;
+        return prev.presentations.some(
+          (p, i) =>
+            p.id !== next.presentations[i].id ||
+            p.name !== next.presentations[i].name
+        );
+      }
+
+      /** Keep partial in-progress taps when live updates re-render the ballot. */
+      function captureDraftFromDom() {
+        if (ballot.hidden || !ballotBody.children.length || !state) return;
+        const draft = existingScores ? structuredClone(existingScores) : {};
+        for (const p of state.presentations) {
+          draft[p.id] = draft[p.id] || {};
+          for (const c of state.criteria) {
+            const selected = ballotBody.querySelector(
+              `button[data-p="${p.id}"][data-c="${c.id}"][aria-pressed="true"]`
+            );
+            if (selected) draft[p.id][c.id] = Number(selected.dataset.v);
+          }
+        }
+        existingScores = draft;
       }
 
       function renderBallot() {
@@ -192,17 +219,22 @@
           return false;
         }
         const data = await res.json();
-        existingScores = data.vote?.scores || null;
+        // Prefer server vote when present; never wipe a local draft with null.
+        if (data.vote?.scores) existingScores = data.vote.scores;
         return true;
       }
 
-      function showBallotMode() {
-        joinCard.hidden = true;
-        ballot.hidden = false;
-        renderBallot();
+      function updateBallotChrome() {
         statusPill.textContent =
           state.phase === "closed" ? "Voting closed" : "Connected";
         submitBtn.disabled = state.phase === "closed";
+      }
+
+      function showBallotMode({ rebuild = true } = {}) {
+        joinCard.hidden = true;
+        ballot.hidden = false;
+        if (rebuild) renderBallot();
+        updateBallotChrome();
       }
 
       function showJoinMode() {
@@ -222,6 +254,10 @@
         );
         group.forEach((el) => el.setAttribute("aria-pressed", "false"));
         btn.setAttribute("aria-pressed", "true");
+        const { p, c, v } = btn.dataset;
+        existingScores = existingScores || {};
+        existingScores[p] = existingScores[p] || {};
+        existingScores[p][c] = Number(v);
       });
 
       document.getElementById("joinBtn").addEventListener("click", async () => {
@@ -248,6 +284,7 @@
 
       ballot.addEventListener("submit", async (event) => {
         event.preventDefault();
+        if (redirectingToLive) return;
         const scores = collectScores();
         if (!scores) {
           showToast("Please score every criterion for all presentations");
@@ -263,22 +300,40 @@
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Submit failed");
           existingScores = scores;
+          redirectingToLive = true;
           showToast("Vote saved — opening live screen");
-          window.location.href = "/display.html";
+          window.location.replace("/display.html");
           return;
         } catch (error) {
+          redirectingToLive = false;
           showToast(error.message);
-        } finally {
           submitBtn.disabled = state.phase === "closed";
         }
       });
 
       onState(async (next) => {
+        if (redirectingToLive) return;
+        // Snapshot taps before any async work so another voter's submit
+        // cannot wipe this device's unfinished ballot.
+        captureDraftFromDom();
+        const prev = state;
         state = next;
+
         if (voterId) {
           const ok = await ensureVoterSession();
-          if (ok) showBallotMode();
-          else showJoinMode();
+          if (!ok) {
+            showJoinMode();
+            return;
+          }
+          if (ballot.hidden) {
+            showBallotMode({ rebuild: true });
+            return;
+          }
+          if (presentationsChanged(prev, next)) {
+            showBallotMode({ rebuild: true });
+          } else {
+            updateBallotChrome();
+          }
         } else {
           showJoinMode();
         }
