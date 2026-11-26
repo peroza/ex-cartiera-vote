@@ -62,12 +62,7 @@
         font-weight: 800;
       }
       .results {
-        margin-top: 1.2rem;
-      }
-      .results h2 {
-        font-family: var(--font-display);
-        font-size: 2rem;
-        margin: 0 0 0.8rem;
+        margin-top: 0;
       }
       .board {
         display: grid;
@@ -78,6 +73,10 @@
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 20px;
         padding: 1rem 1.15rem;
+      }
+      .board-card.is-first {
+        background: rgba(198, 232, 107, 0.12);
+        border-color: rgba(198, 232, 107, 0.45);
       }
       .board-card .title {
         display: flex;
@@ -90,6 +89,10 @@
         margin: 0;
         font-family: var(--font-display);
         font-size: 1.45rem;
+      }
+      .board-card .place {
+        color: var(--lime);
+        margin-right: 0.35rem;
       }
       .overall {
         font-family: var(--font-display);
@@ -123,7 +126,7 @@
     <main class="shell" style="padding-top: 1.6rem">
       <header class="header rise">
         <div>
-          <div class="live-row"><span class="live-dot"></span> Live voting</div>
+          <div class="live-row" id="modeLabel"><span class="live-dot"></span> Live voting</div>
           <h1 class="brand">Ex Cartiera</h1>
         </div>
         <div class="stat">
@@ -138,7 +141,6 @@
       <section class="grid" id="liveGrid"></section>
 
       <section class="results" id="resultsSection" hidden>
-        <h2>Final scores</h2>
         <div class="board" id="resultsBoard"></div>
       </section>
     </main>
@@ -151,6 +153,7 @@
       const resultsBoard = document.getElementById("resultsBoard");
       const voteCount = document.getElementById("voteCount");
       const progressFill = document.getElementById("progressFill");
+      const modeLabel = document.getElementById("modeLabel");
 
       function renderLive(state) {
         const items = state.live?.presentations || state.presentations.map((p) => ({
@@ -177,14 +180,10 @@
       }
 
       function renderResults(state) {
-        if (!state.resultsRevealed || !state.results) {
-          resultsSection.hidden = true;
-          return;
-        }
-        resultsSection.hidden = false;
         const ranking = state.results.ranking;
         resultsBoard.innerHTML = ranking
           .map((p, index) => {
+            const place = index + 1;
             const criteriaBars = state.criteria
               .map((c) => {
                 const avg = p.criteria[c.id].average;
@@ -198,9 +197,9 @@
               })
               .join("");
             return `
-              <article class="board-card rise" style="animation-delay:${index * 0.06}s">
+              <article class="board-card rise${place === 1 ? " is-first" : ""}" style="animation-delay:${index * 0.06}s">
                 <div class="title">
-                  <h3>#${index + 1} · ${p.name}</h3>
+                  <h3><span class="place">#${place}</span> ${p.name}</h3>
                   <div class="overall">${
                     p.overallAverage == null ? "—" : p.overallAverage.toFixed(2)
                   }</div>
@@ -211,11 +210,29 @@
           .join("");
       }
 
+      function showLiveMode(state) {
+        modeLabel.innerHTML = `<span class="live-dot"></span> Live voting`;
+        liveGrid.hidden = false;
+        resultsSection.hidden = true;
+        renderLive(state);
+      }
+
+      function showRankingMode(state) {
+        modeLabel.innerHTML = `Final ranking`;
+        liveGrid.hidden = true;
+        liveGrid.innerHTML = "";
+        resultsSection.hidden = false;
+        renderResults(state);
+      }
+
       onState((state) => {
         voteCount.textContent = `${state.progress.voteCount}/${state.progress.totalQuota}`;
         progressFill.style.width = `${progressPercent(state.progress)}%`;
-        renderLive(state);
-        renderResults(state);
+        if (state.resultsRevealed && state.results) {
+          showRankingMode(state);
+        } else {
+          showLiveMode(state);
+        }
       });
 
       connectLive();
