@@ -28,27 +28,27 @@
         padding: 1.1rem;
         margin-bottom: 1rem;
       }
-      .pres-title {
+      .criterion-title {
         font-family: var(--font-display);
         font-size: 1.35rem;
-        margin: 0 0 0.85rem;
+        margin: 0 0 0.35rem;
       }
-      .criterion {
+      .criterion-question {
+        margin: 0 0 0.9rem;
+        font-size: 0.92rem;
+        color: var(--ink-soft);
+      }
+      .group-score {
         padding: 0.85rem 0;
         border-top: 1px solid var(--line);
       }
-      .criterion:first-of-type {
+      .group-score:first-of-type {
         border-top: 0;
         padding-top: 0;
       }
-      .criterion h3 {
-        margin: 0 0 0.25rem;
-        font-size: 0.95rem;
-      }
-      .criterion p {
-        margin: 0 0 0.65rem;
-        font-size: 0.88rem;
-        color: var(--ink-soft);
+      .group-score h3 {
+        margin: 0 0 0.55rem;
+        font-size: 1rem;
       }
       .sticky {
         position: sticky;
@@ -141,18 +141,18 @@
       }
 
       function renderBallot() {
-        ballotBody.innerHTML = state.presentations
+        ballotBody.innerHTML = state.criteria
           .map(
-            (p) => `
-          <section class="panel card" data-presentation="${p.id}">
-            <h2 class="pres-title">${p.name}</h2>
-            ${state.criteria
+            (c) => `
+          <section class="panel card" data-criterion="${c.id}">
+            <h2 class="criterion-title">${c.short}</h2>
+            <p class="criterion-question">${c.question}</p>
+            ${state.presentations
               .map(
-                (c) => `
-              <div class="criterion">
-                <h3>${c.short}</h3>
-                <p>${c.question}</p>
-                <div class="score-scale" role="group" aria-label="${c.short}">
+                (p) => `
+              <div class="group-score">
+                <h3>${p.name}</h3>
+                <div class="score-scale" role="group" aria-label="${c.short} — ${p.name}">
                   ${[1, 2, 3, 4, 5]
                     .map((n) => {
                       const pressed = scoreValue(p.id, c.id) === n;
