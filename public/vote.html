@@ -263,7 +263,9 @@
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Submit failed");
           existingScores = scores;
-          showToast("Vote saved — you can update it until voting closes");
+          showToast("Vote saved — opening live screen");
+          window.location.href = "/display.html";
+          return;
         } catch (error) {
           showToast(error.message);
         } finally {
