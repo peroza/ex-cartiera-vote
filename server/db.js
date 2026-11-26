@@ -6,10 +6,18 @@ const dataDir = process.env.DATA_DIR || path.join(__dirname, "..", "data");
 fs.mkdirSync(dataDir, { recursive: true });
 const dbPath = path.join(dataDir, "state.json");
 
+function resolveAdminPin(existingPin) {
+  if (process.env.ADMIN_PIN && /^\d{4,8}$/.test(process.env.ADMIN_PIN)) {
+    return process.env.ADMIN_PIN;
+  }
+  if (existingPin) return String(existingPin);
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+
 function defaultState() {
   return {
     settings: {
-      admin_pin: String(Math.floor(1000 + Math.random() * 9000)),
+      admin_pin: resolveAdminPin(null),
       phase: "open",
       results_revealed: "0",
       active_presentation: "all",
@@ -25,18 +33,20 @@ function defaultState() {
 }
 
 function load() {
+  let loaded;
   if (!fs.existsSync(dbPath)) {
-    const initial = defaultState();
-    save(initial);
-    return initial;
+    loaded = defaultState();
+  } else {
+    try {
+      loaded = JSON.parse(fs.readFileSync(dbPath, "utf8"));
+    } catch {
+      loaded = defaultState();
+    }
   }
-  try {
-    return JSON.parse(fs.readFileSync(dbPath, "utf8"));
-  } catch {
-    const initial = defaultState();
-    save(initial);
-    return initial;
-  }
+  loaded.settings = loaded.settings || {};
+  loaded.settings.admin_pin = resolveAdminPin(loaded.settings.admin_pin);
+  save(loaded);
+  return loaded;
 }
 
 function save(state) {
