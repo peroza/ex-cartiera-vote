@@ -1,27 +1,27 @@
 const CRITERIA = [
   {
-    id: "community",
-    short: "Community value",
+    id: "pitch",
+    short: "Presentation quality and effectiveness",
     question:
-      "How well does the project respond to the needs of Ex Cartiera and create value for the local community?",
+      "How effective is the 5 min pitch, including participation by all group members and the ability to discuss and justify the proposal?",
   },
   {
     id: "clarity",
-    short: "Clarity & evidence",
+    short: "Project logic and clarity",
     question:
       "How clear are the proposal’s objectives, activities, and expected results, and how well are they supported by evidence and concepts?",
   },
   {
     id: "feasibility",
-    short: "Feasibility",
+    short: "Feasibility of the proposal",
     question:
       "How realistic and sustainable is the project’s implementation, financial plan, and approach to monitoring results?",
   },
   {
-    id: "pitch",
-    short: "Pitch quality",
+    id: "community",
+    short: "Value for the local community (impact)",
     question:
-      "How effective is the 5 min pitch, including participation by all group members and the ability to discuss and justify the proposal?",
+      "How well does the project respond to the needs of Ex Cartiera and create value for the local community?",
   },
 ];
 
