@@ -125,13 +125,15 @@
           (r) => (state.progress.roleCounts[r.id] || 0) < r.quota
         );
         if (firstOpen) roleSelect.value = firstOpen.id;
-        quotaHint.textContent = `Seats left — students ${
-          state.progress.roleQuotas.student - (state.progress.roleCounts.student || 0)
-        }, teachers ${
-          state.progress.roleQuotas.teacher - (state.progress.roleCounts.teacher || 0)
-        }, staff ${
-          state.progress.roleQuotas.staff - (state.progress.roleCounts.staff || 0)
-        }.`;
+        quotaHint.textContent = state.roles
+          .map((r) => {
+            const left =
+              (state.progress.roleQuotas[r.id] || 0) -
+              (state.progress.roleCounts[r.id] || 0);
+            return `${r.label.toLowerCase()} ${left}`;
+          })
+          .join(" · ");
+        quotaHint.textContent = `Seats left — ${quotaHint.textContent}.`;
       }
 
       function scoreValue(presentationId, criterionId) {

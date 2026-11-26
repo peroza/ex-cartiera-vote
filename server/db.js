@@ -149,6 +149,19 @@ function resetVotesAndVoters() {
   persist();
 }
 
+function weightedAverage(roleAverages) {
+  let weightedSum = 0;
+  let weightTotal = 0;
+  for (const role of ROLES) {
+    const average = roleAverages[role.id];
+    if (typeof average !== "number") continue;
+    weightedSum += average * role.weight;
+    weightTotal += role.weight;
+  }
+  if (weightTotal === 0) return null;
+  return Number((weightedSum / weightTotal).toFixed(2));
+}
+
 function computeResults() {
   const presentations = listPresentations();
   const votes = listVotesWithVoters();
@@ -166,8 +179,6 @@ function computeResults() {
           { sum: 0, count: 0, average: null, byRole: {} },
         ])
       ),
-      overallSum: 0,
-      overallCount: 0,
       overallAverage: null,
       voteCount: 0,
     };
@@ -187,8 +198,6 @@ function computeResults() {
       const presentationScores = vote.scores[p.id];
       if (!presentationScores) continue;
       let presentationHasScore = false;
-      let localSum = 0;
-      let localCount = 0;
       for (const c of CRITERIA) {
         const value = presentationScores[c.id];
         if (typeof value !== "number") continue;
@@ -200,34 +209,42 @@ function computeResults() {
           bucket.byRole[vote.role].sum += value;
           bucket.byRole[vote.role].count += 1;
         }
-        localSum += value;
-        localCount += 1;
       }
       if (presentationHasScore) {
         byPresentation[p.id].voteCount += 1;
-        byPresentation[p.id].overallSum += localSum;
-        byPresentation[p.id].overallCount += localCount;
       }
     }
   }
 
   for (const p of presentations) {
     const entry = byPresentation[p.id];
+    const criterionAverages = [];
     for (const c of CRITERIA) {
       const bucket = entry.criteria[c.id];
-      bucket.average =
-        bucket.count > 0 ? Number((bucket.sum / bucket.count).toFixed(2)) : null;
+      const roleAverages = {};
       for (const r of ROLES) {
         const roleBucket = bucket.byRole[r.id];
         roleBucket.average =
           roleBucket.count > 0
             ? Number((roleBucket.sum / roleBucket.count).toFixed(2))
             : null;
+        if (roleBucket.average != null) {
+          roleAverages[r.id] = roleBucket.average;
+        }
       }
+      // Final criterion score = weighted mix of role averages (normalized by
+      // weights of roles that actually voted, so results stay on the 1–5 scale).
+      bucket.average = weightedAverage(roleAverages);
+      if (bucket.average != null) criterionAverages.push(bucket.average);
     }
     entry.overallAverage =
-      entry.overallCount > 0
-        ? Number((entry.overallSum / entry.overallCount).toFixed(2))
+      criterionAverages.length > 0
+        ? Number(
+            (
+              criterionAverages.reduce((sum, value) => sum + value, 0) /
+              criterionAverages.length
+            ).toFixed(2)
+          )
         : null;
   }
 
@@ -242,6 +259,7 @@ function computeResults() {
     totalQuota,
     roleCounts,
     roleQuotas: Object.fromEntries(ROLES.map((r) => [r.id, r.quota])),
+    roleWeights: Object.fromEntries(ROLES.map((r) => [r.id, r.weight])),
     presentations: presentations.map((p) => byPresentation[p.id]),
     ranking,
   };

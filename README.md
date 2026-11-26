@@ -4,11 +4,13 @@ Live multi-criteria scoring for four presentations during a university lecture.
 
 ## Roles & quotas
 
-- 8 students
-- 4 teachers
-- 4 staff
+- 28 students (weight 0.4)
+- 5 teaching (weight 0.7)
+- 5 Cartiera staff (weight 1.0)
 
 Everyone scores all four presentations on four criteria (1–5).
+Final scores average within each role, then combine with the weights above
+(normalized so results stay on the 1–5 scale).
 
 ## Screens
 

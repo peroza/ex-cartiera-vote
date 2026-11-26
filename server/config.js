@@ -26,9 +26,9 @@ const CRITERIA = [
 ];
 
 const ROLES = [
-  { id: "student", label: "Student", quota: 8 },
-  { id: "teacher", label: "Teacher", quota: 4 },
-  { id: "staff", label: "Staff", quota: 4 },
+  { id: "student", label: "Student", quota: 28, weight: 0.4 },
+  { id: "teacher", label: "Teaching", quota: 5, weight: 0.7 },
+  { id: "staff", label: "Cartiera staff", quota: 5, weight: 1.0 },
 ];
 
 const PRESENTATIONS = [
